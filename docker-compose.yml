@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  postgres:
+    container_name: postgres
+    image: postgres:latest
+    restart: always
+    ports:
+      - "172.25.141.121:5432:5432"
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_MULTIPLE_DATABASES: catalogservice, keycloak, notificationservice, orderservice, paymentservice, returnservice, shippingservice, stockservice, userservice
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready", "-d", "catalog" ]
+      interval: 30s
+      timeout: 60s
+      retries: 5
+
+    volumes:
+      - ./utils/postgres/multiple-databases.sh:/docker-entrypoint-initdb.d/multiple-databases.sh
+    networks:
+      - bookstore-network
+  catalog-service:
+    image: 'catalog-service:latest'
+    build:
+      context: ./catalog-service
+      dockerfile: ./src/main/docker/Dockerfile.jvm
+    restart: always
+    container_name: catalog-service
+    ports:
+      - "10000:10000"
+      - "8081:8081"
+    environment:
+      - POSTGRES_HOST=catalogservice
+      - POSTGRES_USER=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./catalog-service/log:/catalog-service/log
+    networks:
+      - bookstore-network
+networks:
+  bookstore-network:
