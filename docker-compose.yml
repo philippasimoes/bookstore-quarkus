@@ -41,5 +41,25 @@ services:
       - ./catalog-service/log:/catalog-service/log
     networks:
       - bookstore-network
+  stock-service:
+    image: 'stock-service:latest'
+    build:
+      context: ./stock-service
+      dockerfile: ./src/main/docker/Dockerfile.jvm
+    restart: always
+    container_name: stock-service
+    ports:
+      - "10001:10001"
+      - "8082:8082"
+    environment:
+      - POSTGRES_HOST=stockservice
+      - POSTGRES_USER=postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./stock-service/log:/stock-service/log
+    networks:
+      - bookstore-network
 networks:
   bookstore-network:

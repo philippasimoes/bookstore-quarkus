@@ -11,11 +11,13 @@ import com.bookstore.catalog_service.repository.BookRepository;
 import com.bookstore.catalog_service.repository.BookTagRepository;
 import com.bookstore.catalog_service.repository.LanguageRepository;
 import com.bookstore.catalog_service.repository.PublisherRepository;
+import com.bookstore.catalog_service.web.controller.StockResourceClient;
 import io.quarkus.hibernate.orm.panache.Panache;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,8 @@ public class BookService {
   @Inject LanguageRepository languageRepository;
   @Inject PublisherRepository publisherRepository;
   @Inject BookMapper bookMapper;
+
+  @Inject @RestClient StockResourceClient stockResourceClient;
 
   public List<BookDto> getAllBooks() {
     return bookMapper.toDtoList(bookRepository.getAllBooks());
@@ -86,14 +90,22 @@ public class BookService {
   @Transactional
   public BookDto addNewBook(BookDto bookDto) {
 
-    Optional<Book> book2 = bookRepository.findByIsbn(bookDto.getIsbn());
+    Optional<Book> book = bookRepository.findByIsbn(bookDto.getIsbn());
 
-    if (book2.isPresent()) {
+    if (book.isPresent()) {
       throw new RuntimeException("Book with ISBN " + bookDto.getIsbn() + "already exists.");
     } else {
       bookRepository.persist(bookMapper.toEntity(bookDto));
+
+      Optional<Book> addedBook = bookRepository.findByIsbn(bookDto.getIsbn());
+
+      if (addedBook.isPresent()) {
+        stockResourceClient.createStock(addedBook.get().getId());
+      } else {
+        System.out.println("error");
+      }
+      return bookMapper.toDto(addedBook.get());
     }
-    return bookMapper.toDto(bookRepository.findByIsbn(bookDto.getIsbn()).get());
   }
 
   @Transactional

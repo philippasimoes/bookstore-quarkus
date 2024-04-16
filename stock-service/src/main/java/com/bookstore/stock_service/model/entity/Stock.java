@@ -24,10 +24,10 @@ public class Stock {
 
   @Id
   @GeneratedValue(strategy = GenerationType.IDENTITY)
-  private int id;
+  private long id;
 
   @Column(name = "book_id", unique = true)
-  private int bookId;
+  private long bookId;
 
   @Column(name = "available_units")
   private int availableUnits;
