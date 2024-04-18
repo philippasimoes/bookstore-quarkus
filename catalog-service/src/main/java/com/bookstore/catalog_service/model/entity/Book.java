@@ -58,7 +58,7 @@ public class Book extends BaseEntity {
 
   @Column private boolean series;
 
-  @ManyToOne(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+  @ManyToOne
   @JoinColumn(name = "publisher_id")
   private Publisher publisher;
 
@@ -79,7 +79,7 @@ public class Book extends BaseEntity {
   @Enumerated(EnumType.STRING)
   private Format format;
 
-  @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+  @ManyToMany
   @JoinTable(
       name = "book_language",
       joinColumns = @JoinColumn(name = "book_id"),
@@ -87,7 +87,7 @@ public class Book extends BaseEntity {
       schema = "catalogservice")
   private Set<Language> languages;
 
-  @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+  @ManyToMany
   @JoinTable(
       name = "book_author",
       joinColumns = @JoinColumn(name = "book_id"),
@@ -95,7 +95,7 @@ public class Book extends BaseEntity {
       schema = "catalogservice")
   private Set<Author> authors;
 
-  @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+  @ManyToMany
   @JoinTable(
       name = "book_tag",
       joinColumns = @JoinColumn(name = "book_id"),

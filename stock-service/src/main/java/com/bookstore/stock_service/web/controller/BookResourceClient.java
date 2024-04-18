@@ -8,8 +8,6 @@ import jakarta.ws.rs.core.MediaType;
 import org.eclipse.microprofile.rest.client.inject.RegisterRestClient;
 import org.jboss.resteasy.reactive.RestPath;
 
-import java.util.concurrent.CompletionStage;
-
 @Path("/books")
 @RegisterRestClient
 public interface BookResourceClient {

@@ -9,7 +9,7 @@ import org.mapstruct.Mapper;
  *
  * @author Filipa Simões
  */
-@Mapper
+@Mapper(componentModel = "cdi")
 public interface BookSampleMapper {
 
     BookSampleDto toDto(BookSample bookSample);

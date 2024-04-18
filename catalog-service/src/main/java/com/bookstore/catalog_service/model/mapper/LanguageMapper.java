@@ -10,7 +10,7 @@ import org.mapstruct.Mapper;
  *
  * @author Filipa Simões
  */
-@Mapper
+@Mapper(componentModel = "cdi")
 public interface LanguageMapper {
 
   LanguageDto toEntity(Language language);

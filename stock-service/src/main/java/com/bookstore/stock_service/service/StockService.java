@@ -1,6 +1,5 @@
 package com.bookstore.stock_service.service;
 
-import com.bookstore.stock_service.exceptions.StockFoundException;
 import com.bookstore.stock_service.model.Book;
 import com.bookstore.stock_service.model.entity.Stock;
 import com.bookstore.stock_service.model.enums.StockStatus;
@@ -13,24 +12,16 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
-import org.eclipse.microprofile.rest.client.inject.RestClient;
-import org.jboss.logging.Logger;
-
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import org.eclipse.microprofile.rest.client.inject.RestClient;
+import org.jboss.logging.Logger;
 
 @ApplicationScoped
 public class StockService {
 
   private static final Logger LOGGER = Logger.getLogger(StockService.class);
-
-  private static final String TOKEN_URL =
-      "http://keycloak:8080/realms/bookstore/protocol/openid-connect/token";
-  private static final String CATALOG_SERVICE_ID = "catalog-service";
-  private static final String CATALOG_SERVICE_SECRET = "FD3bZqrV67ZGFktuQnX02qaPMuE3V71v";
-  private static final String GRANT_TYPE = "client_credentials";
-  private static final String BOOK_CONFIRMATION_URL = "http://catalog-service/books/confirmation/";
 
   @Inject @RestClient BookResourceClient bookResourceClient;
 
@@ -45,14 +36,13 @@ public class StockService {
    */
   @Transactional
   public void addStock(long bookId) {
-    if (stockRepository.findByBookId(bookId).isEmpty()) {
-      Stock newStockEntry = new Stock();
-      newStockEntry.setAvailableUnits(0);
-      newStockEntry.setPendingUnits(0);
-      newStockEntry.setBookId(bookId);
-      stockRepository.persist(newStockEntry);
-      LOGGER.info(String.format("New stock entry added for book with id %s.", bookId));
-    } else throw new StockFoundException();
+
+    Stock newStockEntry = new Stock();
+    newStockEntry.setAvailableUnits(0);
+    newStockEntry.setPendingUnits(0);
+    newStockEntry.setBookId(bookId);
+    stockRepository.persist(newStockEntry);
+    LOGGER.info(String.format("New stock entry added for book with id %s.", bookId));
   }
 
   /**
@@ -230,41 +220,6 @@ public class StockService {
   }
 
   /**
-   * Authenticate in catalog service.
-   *
-   * @return a jwt token.
-   */
-  //  private String authenticateAndGetJwtToken() {
-  //
-  //    HttpHeaders authHeaders = new HttpHeaders();
-  //    authHeaders.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-  //
-  //    String requestBody =
-  //        "grant_type="
-  //            + GRANT_TYPE
-  //            + "&client_id="
-  //            + CATALOG_SERVICE_ID
-  //            + "&client_secret="
-  //            + CATALOG_SERVICE_SECRET;
-  //
-  //    HttpEntity<String> requestEntity = new HttpEntity<>(requestBody, authHeaders);
-  //
-  //    RestTemplate keycloakRestTemplate = new RestTemplate();
-  //
-  //    ResponseEntity<String> response =
-  //        keycloakRestTemplate.postForEntity(TOKEN_URL, requestEntity, String.class);
-  //
-  //    if (response.getStatusCode().is2xxSuccessful()) {
-  //      LOGGER.info("Authentication successful.");
-  //      return response.getBody();
-  //    } else {
-  //      LOGGER.error(String.format("Authentication failure. Status: %s.",
-  // response.getStatusCode()));
-  //      return null;
-  //    }
-  //  }
-
-  /**
    * Validate if a book is registered in the catalog service.
    *
    * @param bookId the book identifier.
@@ -273,7 +228,22 @@ public class StockService {
    */
   private boolean bookExists(int bookId) throws JsonProcessingException {
 
-    Book book = bookResourceClient.getBookById(bookId);
-    return book != null;
+    try {
+      Book book = bookResourceClient.getBookById(bookId);
+
+      if (book != null) {
+        LOGGER.infof(
+            "Connection with catalog service successful: book with title %s will have stock updated.",
+            book.title());
+        return true;
+      } else {
+        LOGGER.info(
+            "Connection with catalog service successful: book with title does not exist in catalog.");
+        return false;
+      }
+    } catch (Exception e) {
+      LOGGER.error("Error connecting to catalog service.");
+      return false;
+    }
   }
 }

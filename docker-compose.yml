@@ -31,6 +31,7 @@ services:
     ports:
       - "10000:10000"
       - "8081:8081"
+      - "8000:8000"  #jobrnr dashboard
     environment:
       - POSTGRES_HOST=catalogservice
       - POSTGRES_USER=postgres
