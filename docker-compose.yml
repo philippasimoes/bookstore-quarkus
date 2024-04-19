@@ -38,6 +38,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      consul:
+        condition: service_started
     volumes:
       - ./catalog-service/log:/catalog-service/log
     networks:
@@ -58,8 +60,19 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      consul:
+        condition: service_started
     volumes:
       - ./stock-service/log:/stock-service/log
+    networks:
+      - bookstore-network
+  consul:
+    image: hashicorp/consul:latest
+    command: agent -dev -ui -client=0.0.0.0 -bind=0.0.0.0 --https-port=8501
+    ports:
+      - "8500:8500"
+      - "8501:8501"
+      - "8002:8002"
     networks:
       - bookstore-network
 networks:

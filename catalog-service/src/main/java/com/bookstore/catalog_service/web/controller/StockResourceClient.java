@@ -7,8 +7,8 @@ import org.jboss.resteasy.reactive.RestPath;
 
 import java.util.concurrent.CompletionStage;
 
-@Path("/stock")
-@RegisterRestClient
+@Path("/api/stock")
+@RegisterRestClient(baseUri = "stork://stock-service")
 public interface StockResourceClient {
 
   @POST
