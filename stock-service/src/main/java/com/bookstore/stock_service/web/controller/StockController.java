@@ -2,6 +2,7 @@ package com.bookstore.stock_service.web.controller;
 
 import com.bookstore.stock_service.model.enums.StockStatus;
 import com.bookstore.stock_service.service.StockService;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PATCH;
@@ -30,9 +31,10 @@ public class StockController {
   @ResponseStatus(200)
   @Path("/book/{book_id}")
   public RestResponse<String> updateStock(
-      @RestPath("book_id") int bookId, @QueryParam("units") int units) {
-
-    return validateStockStatus(stockService.updateStock(bookId, units));
+      @RestPath("book_id") int bookId, @QueryParam("units") int units)
+      throws JsonProcessingException {
+    StockStatus stockStatus = stockService.updateStock(bookId, units);
+    return validateStockStatus(stockStatus);
   }
 
   @PATCH
@@ -83,9 +85,9 @@ public class StockController {
       case MESSAGE_ERROR -> {
         return RestResponse.serverError();
       }
-        default -> {
-            return RestResponse.notModified();
-        }
+      default -> {
+        return RestResponse.notModified();
+      }
     }
   }
 }

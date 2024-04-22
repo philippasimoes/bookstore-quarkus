@@ -4,6 +4,7 @@ import com.bookstore.stock_service.model.Book;
 import com.bookstore.stock_service.model.entity.Stock;
 import com.bookstore.stock_service.model.enums.StockStatus;
 import com.bookstore.stock_service.repository.StockRepository;
+import com.bookstore.stock_service.utils.KafkaProducer;
 import com.bookstore.stock_service.web.controller.BookResourceClient;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -27,6 +28,7 @@ public class StockService {
 
   @Inject StockRepository stockRepository;
   @Inject ObjectMapper objectMapper;
+  @Inject KafkaProducer producer;
 
   /**
    * Used by catalog-service: when the book is created, a stock entry is created with the new book
@@ -58,24 +60,36 @@ public class StockService {
 
     Optional<Stock> stock = stockRepository.findByBookId(bookId);
 
-    try {
-      if (bookExists(bookId) && stock.isPresent()) {
+    StockStatus stockStatus;
 
-        // add books to stock
-        if (units > 0) return addAvailableUnits(stock.get(), units);
-        // remove books from stock
-        else return removeAvailableUnitsAndUpdatePendingUnits(stock.get(), units);
+    try {
+      if (bookExists(bookId) && (stock.isPresent())) {
+
+        if (units > 0) {
+          // add books to stock
+          addAvailableUnits(stock.get(), units);
+          stockStatus = StockStatus.UPDATED;
+        } else {
+          // remove books from stock
+          stockStatus = removeAvailableUnitsAndUpdatePendingUnits(stock.get(), units);
+        }
+
+        if (stockRepository.findByBookId(bookId).get().getAvailableUnits() > 0)
+          buildAndSendMessage("available", bookId);
+        else buildAndSendMessage("soldout", bookId);
 
       } else {
         LOGGER.error(
             "Book is not present in catalog. Please insert the book in Catalog Service before adding stock.");
-        return StockStatus.BOOK_NOT_FOUND;
+        stockStatus = StockStatus.BOOK_NOT_FOUND;
       }
 
     } catch (JsonProcessingException e) {
       LOGGER.error("Error building message", e);
-      return StockStatus.MESSAGE_ERROR;
+      stockStatus = StockStatus.MESSAGE_ERROR;
     }
+
+    return stockStatus;
   }
 
   /**
@@ -83,11 +97,10 @@ public class StockService {
    *
    * @param stock the stock entry.
    * @param units the units to be added.
-   * @return UPDATED {@link StockStatus}
    * @throws JsonProcessingException when there's an error with messaging service.
    */
   @Transactional
-  public StockStatus addAvailableUnits(Stock stock, int units) throws JsonProcessingException {
+  public void addAvailableUnits(Stock stock, int units) throws JsonProcessingException {
 
     int updatedUnits = stock.getAvailableUnits() + units;
     stock.setAvailableUnits(updatedUnits);
@@ -97,8 +110,6 @@ public class StockService {
         String.format(
             "Stock updated - book with id %s have %s units",
             stock.getBookId(), stock.getAvailableUnits()));
-
-    return StockStatus.UPDATED;
   }
 
   /**
@@ -108,8 +119,6 @@ public class StockService {
    *
    * @param stock the stock entry.
    * @param units the units to be removed from the available units and added to the pending units.
-   * @return INSUFFICIENT_STOCK, UPDATED or SOLD_OUT {@link StockStatus} according to the number of
-   *     available units.
    * @throws JsonProcessingException when there's an error with messaging service.
    */
   @Transactional
@@ -122,7 +131,7 @@ public class StockService {
       int updatedUnits =
           stock.getAvailableUnits() + units; // because the units is a negative number in this case
       stock.setAvailableUnits(updatedUnits);
-      stock.setPendingUnits(stock.getPendingUnits() + units);
+      stock.setPendingUnits(stock.getPendingUnits() + Math.abs(units));
       Panache.getEntityManager().merge(stock);
 
       Stock updatedStock = stockRepository.findById(stock.getId());
@@ -133,20 +142,9 @@ public class StockService {
               updatedStock.getBookId(),
               updatedStock.getAvailableUnits(),
               updatedStock.getPendingUnits()));
-
-      // sending a message to catalog service (the queue is chosen according to the number of
-      // available units)
       if (updatedStock.getAvailableUnits() > 0) {
-        // producer.sendMessage(eventUpdatedQueue, buildMessage(stock.getBookId()));
         return StockStatus.UPDATED;
-      } else {
-        // producer.sendMessage(eventSoldOutQueue, buildMessage(stock.getBookId()));
-        //        LOGGER.info(
-        //            String.format("Stock updated - book with id %s is sold out",
-        // stock.getBookId()));
-
-        return StockStatus.SOLD_OUT;
-      }
+      } else return StockStatus.SOLD_OUT;
     }
   }
 
@@ -197,7 +195,7 @@ public class StockService {
    * @param bookId the book identifier.
    * @return the number of available units.
    */
-  public int getAvailableUnitsByBookId(int bookId) {
+  public int getAvailableUnitsByBookId(long bookId) {
 
     if (stockRepository.findByBookId(bookId).isPresent()) {
       return stockRepository.findByBookId(bookId).get().getAvailableUnits();
@@ -208,15 +206,14 @@ public class StockService {
    * Build a message to be sent by rabbitmq to catalog service with the book available units.
    *
    * @param bookId the book identifier.
-   * @return the message containing the book identifier and the available units.
    * @throws JsonProcessingException when there's an error with messaging service.
    */
-  private String buildMessage(int bookId) throws JsonProcessingException {
+  private void buildAndSendMessage(String topic, long bookId) throws JsonProcessingException {
 
-    Map<Integer, Integer> map = new HashMap<>();
+    Map<Long, Integer> map = new HashMap<>();
     map.put(bookId, getAvailableUnitsByBookId(bookId));
 
-    return objectMapper.writeValueAsString(map);
+    producer.send(topic, objectMapper.writeValueAsString(map));
   }
 
   /**

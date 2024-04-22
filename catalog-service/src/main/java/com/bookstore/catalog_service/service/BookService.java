@@ -20,16 +20,28 @@ import com.bookstore.catalog_service.repository.BookTagRepository;
 import com.bookstore.catalog_service.repository.LanguageRepository;
 import com.bookstore.catalog_service.repository.PublisherRepository;
 import com.bookstore.catalog_service.web.controller.StockResourceClient;
+import com.fasterxml.jackson.core.JsonParser;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.hibernate.orm.panache.Panache;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.NotFoundException;
+
+import java.io.IOException;
 import java.time.Duration;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.Executors;
+
+import org.apache.kafka.clients.consumer.ConsumerRecord;
+import org.eclipse.microprofile.reactive.messaging.Acknowledgment;
+import org.eclipse.microprofile.reactive.messaging.Incoming;
 import org.eclipse.microprofile.rest.client.inject.RestClient;
 import org.jboss.logging.Logger;
 import org.jobrunr.scheduling.JobBuilder;
@@ -50,6 +62,7 @@ public class BookService {
   @Inject LanguageMapper languageMapper;
   @Inject BookTagMapper bookTagMapper;
   @Inject JobScheduler jobScheduler;
+  @Inject ObjectMapper objectMapper;
 
   @Inject @RestClient StockResourceClient stockResourceClient;
 
@@ -228,7 +241,7 @@ public class BookService {
       newPublisher.setPhoneNumber(bookDto.getPublisher().getPhoneNumber());
       publisherRepository.persist(newPublisher);
     }
-    return publisher;
+    return publisherRepository.findByName(bookDto.getPublisher().getName());
   }
 
   @Transactional
@@ -256,7 +269,7 @@ public class BookService {
 
   public void addStockEntry(long id) {
     try {
-      addStockEntryFallback(id);
+      stockResourceClient.createStock(id);
       LOGGER.info("Connected to stock service.");
     } catch (Exception e) {
       LOGGER.errorf("Error connecting with stock service. %s", e.getMessage());
@@ -270,5 +283,55 @@ public class BookService {
 
   public void addStockEntryFallback(long id) {
     stockResourceClient.createStock(id);
+  }
+
+  @Incoming("available-in")
+  @Acknowledgment(Acknowledgment.Strategy.PRE_PROCESSING)
+  public void receiveAvailable(ConsumerRecord<String, String> message) {
+
+    System.out.println("Received message: " + message);
+
+    try {
+      JsonNode jsonNode = objectMapper.readTree(message.value());
+
+      new Thread(() -> updateBookFromMessage(jsonNode, Availability.AVAILABLE)).start();
+
+    } catch (JsonProcessingException e) {
+      LOGGER.error(e.getMessage());
+    }
+  }
+
+  @Incoming("soldout-in")
+  @Acknowledgment(Acknowledgment.Strategy.PRE_PROCESSING)
+  public void receiveSoldOut(ConsumerRecord<String, String> message) {
+
+    System.out.println("Received message: " + message);
+
+    try {
+      JsonNode jsonNode = objectMapper.readTree(message.value());
+
+      new Thread(() -> updateBookFromMessage(jsonNode, Availability.SOLD_OUT)).start();
+
+    } catch (JsonProcessingException e) {
+      LOGGER.error(e.getMessage());
+    }
+  }
+
+  @Transactional
+  public void updateBookFromMessage(JsonNode jsonNode, Availability availability) {
+
+    Map<String, Integer> map =
+        objectMapper.convertValue(jsonNode, objectMapper.getTypeFactory().constructType(Map.class));
+    Map.Entry<String, Integer> entry = map.entrySet().iterator().next();
+
+    Book book = bookRepository.findById(Long.valueOf(entry.getKey()));
+    book.setStockAvailable(entry.getValue());
+    book.setAvailability(availability);
+    Panache.getEntityManager().merge(book);
+
+    LOGGER.info(
+        String.format(
+            "Book updated: Availability: %s, stock: %s",
+            book.getAvailability(), book.getStockAvailable()));
   }
 }
