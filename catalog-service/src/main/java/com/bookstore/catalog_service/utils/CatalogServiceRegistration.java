@@ -16,9 +16,9 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 @ApplicationScoped
-public class StockServiceRegistration {
+public class CatalogServiceRegistration {
 
-  private static final Logger LOGGER = Logger.getLogger(StockServiceRegistration.class);
+  private static final Logger LOGGER = Logger.getLogger(CatalogServiceRegistration.class);
   private final String QUARKUS_HTTP_PORT = "quarkus.http.port";
 
   @ConfigProperty(name = "consul.host")

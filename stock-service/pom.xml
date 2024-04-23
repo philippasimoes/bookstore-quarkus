@@ -4,7 +4,7 @@
 
     <parent>
         <groupId>com.bookstore</groupId>
-        <artifactId>bookstore</artifactId>
+        <artifactId>bookstore-quarkus</artifactId>
         <version>0.0.1-SNAPSHOT</version>
     </parent>
 
@@ -46,12 +46,10 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-junit5</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>io.rest-assured</groupId>
             <artifactId>rest-assured</artifactId>
-            <scope>test</scope>
         </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
@@ -76,6 +74,14 @@
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-messaging-kafka</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-health</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkiverse.helm</groupId>
+            <artifactId>quarkus-helm</artifactId>
         </dependency>
     </dependencies>
 

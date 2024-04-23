@@ -10,11 +10,11 @@
 #
 # Then, build the image with:
 #
-# docker build -f src/main/docker/Dockerfile.native-micro -t quarkus/stockservice .
+# docker build -f src/main/docker/Dockerfile.native-micro -t quarkus/stock-service .
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/stockservice
+# docker run -i --rm -p 8080:8080 quarkus/stock-service
 #
 ###
 FROM quay.io/quarkus/quarkus-micro-image:2.0
